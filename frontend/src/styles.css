@@ -68,6 +68,7 @@ h1 {
 
 .status-panel,
 .market-summary,
+.market-feed,
 .recommendation-card {
   border: 1px solid rgba(23, 32, 24, 0.14);
   background: rgba(255, 255, 255, 0.62);
@@ -179,6 +180,35 @@ h1 {
   background: rgba(255, 255, 255, 0.48);
 }
 
+.market-feed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.market-feed div {
+  display: grid;
+  gap: 4px;
+}
+
+.market-feed span {
+  color: #667066;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.market-feed a,
+.price-row a {
+  color: #1e5f4d;
+  font-weight: 900;
+  text-decoration: none;
+}
+
 .recommendation-list {
   display: grid;
   gap: 14px;
@@ -249,6 +279,24 @@ h1 {
   color: #204c3e;
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.price-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+  color: #243325;
+  font-weight: 800;
+}
+
+.up {
+  color: #b6372f;
+}
+
+.down {
+  color: #1f61a8;
 }
 
 .risk {

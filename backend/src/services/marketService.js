@@ -1,5 +1,6 @@
 import { getPool } from '../db.js';
 import { indices as sampleIndices, recommendations as sampleRecommendations } from '../data/sampleData.js';
+import { buildNaverRecommendations } from './naverFinanceService.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -18,6 +19,13 @@ export async function listIndices(useDatabase) {
 }
 
 export async function listRecommendations({ market, period, useDatabase }) {
+  try {
+    const naverData = await buildNaverRecommendations(market, period);
+    return naverData;
+  } catch (error) {
+    console.warn(`Falling back from Naver Finance data: ${error.message}`);
+  }
+
   if (!useDatabase) {
     return {
       market,

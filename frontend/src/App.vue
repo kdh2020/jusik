@@ -21,6 +21,26 @@ const selectedMarketMeta = computed(() => {
 
 const recommendations = computed(() => payload.value?.recommendations || []);
 
+const sourceLabel = computed(() => {
+  if (source.value === 'naver-finance') {
+    return 'Naver Finance';
+  }
+
+  return source.value === 'mysql' ? 'MySQL' : 'Sample Data';
+});
+
+function formatPrice(value) {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+
+  return Number(value).toLocaleString();
+}
+
+function changeClass(value) {
+  return Number(value || 0) >= 0 ? 'up' : 'down';
+}
+
 async function loadMarkets() {
   const response = await fetchIndices();
   markets.value = response.data;
@@ -69,7 +89,7 @@ onMounted(async () => {
       </div>
       <div class="status-panel">
         <span>데이터 소스</span>
-        <strong>{{ source === 'mysql' ? 'MySQL' : 'Sample Data' }}</strong>
+        <strong>{{ sourceLabel }}</strong>
       </div>
     </section>
 
@@ -119,6 +139,20 @@ onMounted(async () => {
       </div>
     </section>
 
+    <section class="market-feed" v-if="payload?.marketSignal">
+      <div>
+        <span>네이버 지수</span>
+        <strong>{{ formatPrice(payload.marketSignal.latestPrice) }}</strong>
+      </div>
+      <div>
+        <span>등락률</span>
+        <strong :class="changeClass(payload.marketSignal.changeRate)">
+          {{ payload.marketSignal.changeRate.toFixed(2) }}%
+        </strong>
+      </div>
+      <a :href="payload.marketSignal.naverUrl" target="_blank" rel="noreferrer">네이버에서 보기</a>
+    </section>
+
     <p v-if="error" class="error-message">{{ error }}</p>
 
     <section v-else class="recommendation-list" aria-live="polite">
@@ -140,6 +174,13 @@ onMounted(async () => {
               <span>{{ item.sector }}</span>
               <span>{{ item.signal }}</span>
               <span>{{ item.targetHorizon }}</span>
+            </div>
+            <div v-if="item.latestPrice" class="price-row">
+              <span>네이버 종가 {{ formatPrice(item.latestPrice) }}</span>
+              <strong :class="changeClass(item.changeRate)">
+                {{ item.changeRate.toFixed(2) }}%
+              </strong>
+              <a :href="item.naverUrl" target="_blank" rel="noreferrer">네이버</a>
             </div>
             <p class="risk">{{ item.riskNote }}</p>
           </div>
