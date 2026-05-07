@@ -1,0 +1,17 @@
+{
+  "name": "stock-pick-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Daily and weekly stock recommendation web app with Node.js, Vue.js, and MySQL.",
+  "scripts": {
+    "install:all": "npm.cmd --prefix backend install && npm.cmd --prefix frontend install",
+    "dev": "npm.cmd --prefix backend run dev",
+    "dev:backend": "npm.cmd --prefix backend run dev",
+    "dev:frontend": "npm.cmd --prefix frontend run dev",
+    "build": "npm.cmd --prefix frontend run build",
+    "start": "npm.cmd --prefix backend start"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
