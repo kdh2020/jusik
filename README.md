@@ -48,3 +48,14 @@ Then update `.env` with your MySQL credentials. If MySQL is not available, the b
 
 Allowed `market` values are `KOSPI`, `NIKKEI225`, and `SP500`.
 Allowed `period` values are `daily` and `weekly`.
+
+## Free Web Deployment
+
+This repository can be deployed to Vercel as a single project:
+
+1. Import `kdh2020/jusik` in Vercel.
+2. Keep the framework preset as Vite.
+3. Use the repository root as the project root.
+4. Vercel reads `vercel.json`, builds `frontend`, and exposes serverless API routes from `api/`.
+
+The deployed frontend calls `/api` on the same domain. Local development still works through the Vite proxy when the backend is running on port `4000`.
