@@ -21,9 +21,13 @@ const selectedMarketMeta = computed(() => {
 
 const recommendations = computed(() => payload.value?.recommendations || []);
 
+const activePeriodLabel = computed(() => {
+  return periodOptions.find((period) => period.value === selectedPeriod.value)?.label || '';
+});
+
 const sourceLabel = computed(() => {
   if (source.value === 'naver-finance') {
-    return 'Naver Finance';
+    return 'Naver';
   }
 
   return source.value === 'mysql' ? 'MySQL' : 'Sample Data';
@@ -39,6 +43,12 @@ function formatPrice(value) {
 
 function changeClass(value) {
   return Number(value || 0) >= 0 ? 'up' : 'down';
+}
+
+function signedPercent(value) {
+  const numericValue = Number(value || 0);
+  const sign = numericValue > 0 ? '+' : '';
+  return `${sign}${numericValue.toFixed(2)}%`;
 }
 
 async function loadMarkets() {
@@ -79,22 +89,47 @@ onMounted(async () => {
 
 <template>
   <main class="app-shell">
-    <section class="overview">
-      <div>
-        <p class="eyebrow">Daily & Weekly Stock Picks</p>
-        <h1>3대 지수 기반 주식 추천 대시보드</h1>
-        <p class="intro">
-          KOSPI, Nikkei 225, S&amp;P 500을 기준으로 일일 및 주간 참고 후보를 비교합니다.
-        </p>
+    <header class="site-header">
+      <a class="brand-mark" href="/" aria-label="Jusik Today 홈">
+        <span>J</span>
+        Jusik Today
+      </a>
+      <nav class="header-nav" aria-label="주요 메뉴">
+        <a href="#markets">Markets</a>
+        <a href="#picks">Picks</a>
+        <a href="https://github.com/kdh2020/jusik" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <section class="hero-band">
+      <div class="hero-copy">
+        <p class="eyebrow">Naver Finance Signal</p>
+        <h1>오늘의 시장을 가볍게 열어보는 주식 추천 보드</h1>
       </div>
-      <div class="status-panel">
-        <span>데이터 소스</span>
+      <div class="hero-status">
+        <span>데이터</span>
         <strong>{{ sourceLabel }}</strong>
+        <small>{{ payload?.asOfDate || 'loading' }}</small>
       </div>
     </section>
 
-    <section class="toolbar" aria-label="추천 조건">
-      <div class="market-tabs">
+    <section id="markets" class="quick-section">
+      <div class="section-heading">
+        <h2>시장 선택</h2>
+        <div class="period-switch">
+          <button
+            v-for="period in periodOptions"
+            :key="period.value"
+            :class="{ active: selectedPeriod === period.value }"
+            type="button"
+            @click="selectedPeriod = period.value"
+          >
+            {{ period.label }}
+          </button>
+        </div>
+      </div>
+
+      <div class="market-grid">
         <button
           v-for="market in markets"
           :key="market.code"
@@ -103,89 +138,74 @@ onMounted(async () => {
           @click="selectedMarket = market.code"
         >
           <span>{{ market.name }}</span>
-          <small>{{ market.country }}</small>
-        </button>
-      </div>
-
-      <div class="period-switch">
-        <button
-          v-for="period in periodOptions"
-          :key="period.value"
-          :class="{ active: selectedPeriod === period.value }"
-          type="button"
-          @click="selectedPeriod = period.value"
-        >
-          {{ period.label }}
+          <strong>{{ market.code }}</strong>
+          <small>{{ market.country }} · {{ market.currency }}</small>
         </button>
       </div>
     </section>
 
-    <section class="market-summary" v-if="selectedMarketMeta">
+    <section class="signal-strip" v-if="selectedMarketMeta">
       <div>
         <span>선택 지수</span>
         <strong>{{ selectedMarketMeta.name }}</strong>
       </div>
       <div>
-        <span>통화</span>
-        <strong>{{ selectedMarketMeta.currency }}</strong>
-      </div>
-      <div>
-        <span>기준일</span>
-        <strong>{{ payload?.asOfDate || '-' }}</strong>
+        <span>추천 주기</span>
+        <strong>{{ activePeriodLabel }}</strong>
       </div>
       <div>
         <span>모델</span>
         <strong>{{ payload?.modelVersion || '-' }}</strong>
       </div>
-    </section>
-
-    <section class="market-feed" v-if="payload?.marketSignal">
-      <div>
-        <span>네이버 지수</span>
-        <strong>{{ formatPrice(payload.marketSignal.latestPrice) }}</strong>
-      </div>
-      <div>
-        <span>등락률</span>
-        <strong :class="changeClass(payload.marketSignal.changeRate)">
-          {{ payload.marketSignal.changeRate.toFixed(2) }}%
-        </strong>
-      </div>
-      <a :href="payload.marketSignal.naverUrl" target="_blank" rel="noreferrer">네이버에서 보기</a>
+      <a
+        v-if="payload?.marketSignal"
+        :href="payload.marketSignal.naverUrl"
+        target="_blank"
+        rel="noreferrer"
+      >
+        네이버 지수 {{ signedPercent(payload.marketSignal.changeRate) }}
+      </a>
     </section>
 
     <p v-if="error" class="error-message">{{ error }}</p>
 
-    <section v-else class="recommendation-list" aria-live="polite">
+    <section id="picks" v-else class="recommendation-section" aria-live="polite">
+      <div class="section-heading">
+        <h2>추천 종목</h2>
+        <p>{{ payload?.summary }}</p>
+      </div>
+
       <div v-if="loading" class="loading-state">추천 데이터를 불러오는 중입니다.</div>
 
-      <template v-else-if="recommendations.length">
+      <div v-else-if="recommendations.length" class="recommendation-list">
         <article v-for="item in recommendations" :key="item.symbol" class="recommendation-card">
           <div class="rank-block">
             <span class="rank">#{{ item.rank }}</span>
             <strong>{{ item.score.toFixed(1) }}</strong>
+            <small>score</small>
           </div>
           <div class="stock-info">
             <div class="stock-title">
-              <h2>{{ item.companyName }}</h2>
-              <span>{{ item.symbol }}</span>
-            </div>
-            <p>{{ item.rationale }}</p>
-            <div class="meta-row">
-              <span>{{ item.sector }}</span>
-              <span>{{ item.signal }}</span>
-              <span>{{ item.targetHorizon }}</span>
+              <div>
+                <h3>{{ item.companyName }}</h3>
+                <span>{{ item.symbol }}</span>
+              </div>
+              <a v-if="item.naverUrl" :href="item.naverUrl" target="_blank" rel="noreferrer">Naver</a>
             </div>
             <div v-if="item.latestPrice" class="price-row">
-              <span>네이버 종가 {{ formatPrice(item.latestPrice) }}</span>
-              <strong :class="changeClass(item.changeRate)">
-                {{ item.changeRate.toFixed(2) }}%
-              </strong>
-              <a :href="item.naverUrl" target="_blank" rel="noreferrer">네이버</a>
+              <strong>{{ formatPrice(item.latestPrice) }}</strong>
+              <span :class="changeClass(item.changeRate)">{{ signedPercent(item.changeRate) }}</span>
             </div>
+            <p>{{ item.rationale }}</p>
+            <ul class="meta-row">
+              <li>{{ item.sector }}</li>
+              <li>{{ item.signal }}</li>
+              <li>{{ item.targetHorizon }}</li>
+            </ul>
             <p class="risk">{{ item.riskNote }}</p>
           </div>
         </article>
-      </template>
+      </div>
 
       <div v-else class="loading-state">표시할 추천 종목이 없습니다.</div>
     </section>
