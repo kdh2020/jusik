@@ -35,7 +35,7 @@ router.get('/recommendations', async (req, res, next) => {
     const query = recommendationQuerySchema.parse(req.query);
     const useDatabase = await canUseDatabase();
     const data = await listRecommendations({ ...query, useDatabase });
-    const source = data.modelVersion?.startsWith('naver') ? 'naver-finance' : (useDatabase ? 'mysql' : 'sample-data');
+    const source = data.dataSources?.includes('daum') ? 'naver-daum-finance' : (data.modelVersion?.startsWith('naver') ? 'naver-finance' : (useDatabase ? 'mysql' : 'sample-data'));
 
     res.json({ data, source });
   } catch (error) {

@@ -26,6 +26,10 @@ const activePeriodLabel = computed(() => {
 });
 
 const sourceLabel = computed(() => {
+  if (source.value === 'naver-daum-finance') {
+    return 'Naver + Daum';
+  }
+
   if (source.value === 'naver-finance') {
     return 'Naver';
   }
