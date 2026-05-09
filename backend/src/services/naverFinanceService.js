@@ -3,6 +3,7 @@ import { recommendations as sampleRecommendations } from '../data/sampleData.js'
 const NAVER_MOBILE_BASE_URL = 'https://m.stock.naver.com';
 const NAVER_PC_BASE_URL = 'https://finance.naver.com';
 const DAUM_FINANCE_BASE_URL = 'https://finance.daum.net';
+const YAHOO_FINANCE_BASE_URL = 'https://query1.finance.yahoo.com';
 
 const naverHeaders = {
   'User-Agent': 'Mozilla/5.0',
@@ -26,6 +27,11 @@ const kospiStocks = [
 const worldIndexSymbols = {
   NIKKEI225: 'NII@NI225',
   SP500: 'SPI@SPX'
+};
+
+const yahooIndexSymbols = {
+  NIKKEI225: '^N225',
+  SP500: '^GSPC'
 };
 
 function toNumber(value) {
@@ -141,6 +147,44 @@ async function fetchWorldIndexHistory(symbol) {
   }));
 }
 
+async function fetchYahooIndexHistory(symbol) {
+  const url = `${YAHOO_FINANCE_BASE_URL}/v8/finance/chart/${encodeURIComponent(symbol)}?range=10d&interval=1d`;
+  const payload = await requestJson(url, {
+    'User-Agent': 'Mozilla/5.0'
+  });
+  const result = payload.chart?.result?.[0];
+  const timestamps = result?.timestamp || [];
+  const quote = result?.indicators?.quote?.[0] || {};
+
+  if (timestamps.length === 0 || !quote.close) {
+    throw new Error(`No Yahoo Finance index rows for ${symbol}`);
+  }
+
+  return timestamps
+    .map((timestamp, index) => ({
+      date: new Date(timestamp * 1000).toISOString().slice(0, 10),
+      close: Number(quote.close[index] || 0),
+      open: Number(quote.open[index] || 0),
+      high: Number(quote.high[index] || 0),
+      low: Number(quote.low[index] || 0),
+      volume: Number(quote.volume?.[index] || 0),
+      source: 'yahoo'
+    }))
+    .filter((row) => row.close > 0)
+    .reverse()
+    .map((row, index, rows) => {
+      const previous = rows[index + 1];
+      const change = previous?.close ? row.close - previous.close : 0;
+      const changeRate = previous?.close ? (change / previous.close) * 100 : 0;
+
+      return {
+        ...row,
+        change,
+        changeRate
+      };
+    });
+}
+
 function mergeRows(primaryRow, secondaryRow) {
   if (!secondaryRow) {
     return {
@@ -235,26 +279,46 @@ export async function buildNaverRecommendations(market, period) {
   const periodCompare = history[period === 'weekly' ? Math.min(4, history.length - 1) : 1] || history[0];
   const periodRate = periodCompare.close ? ((latest.close - periodCompare.close) / periodCompare.close) * 100 : latest.changeRate;
 
+  const yahooSymbol = yahooIndexSymbols[market];
+  let yahooHistory = null;
+
+  try {
+    yahooHistory = await fetchYahooIndexHistory(yahooSymbol);
+  } catch (error) {
+    console.warn(`Yahoo Finance fallback for ${market}: ${error.message}`);
+  }
+
+  const mergedLatest = mergeRows({ ...latest, source: 'naver' }, yahooHistory?.[0]);
+  const mergedCompare = mergeRows({ ...periodCompare, source: 'naver' }, yahooHistory?.[period === 'weekly' ? Math.min(4, yahooHistory.length - 1) : 1] || yahooHistory?.[0]);
+  const blendedPeriodRate = mergedCompare.close ? ((mergedLatest.close - mergedCompare.close) / mergedCompare.close) * 100 : periodRate;
+  const dataSources = yahooHistory ? ['naver', 'yahoo'] : ['naver'];
+
   return {
     market,
     period,
-    asOfDate: latest.date,
-    modelVersion: 'naver-index-rules-v1',
-    summary: `네이버 금융 해외 지수 ${symbol}의 최신 변동률 ${latest.changeRate.toFixed(2)}%와 ${period === 'weekly' ? '주간' : '일일'} 흐름을 추천 점수에 반영했습니다. 다음 금융 국내 종목 데이터는 KOSPI 추천에 함께 반영됩니다.`,
-    dataSources: ['naver'],
+    asOfDate: mergedLatest.date || latest.date,
+    modelVersion: yahooHistory ? 'naver-yahoo-index-rules-v1' : 'naver-index-rules-v1',
+    summary: yahooHistory
+      ? `네이버 금융 해외 지수 ${symbol}와 Yahoo Finance ${yahooSymbol}의 ${period === 'weekly' ? '주간' : '일일'} 평균 흐름 ${blendedPeriodRate.toFixed(2)}%를 추천 점수에 반영했습니다.`
+      : `네이버 금융 해외 지수 ${symbol}의 최신 변동률 ${latest.changeRate.toFixed(2)}%와 ${period === 'weekly' ? '주간' : '일일'} 흐름을 추천 점수에 반영했습니다.`,
+    dataSources,
     marketSignal: {
-      latestPrice: latest.close,
-      change: latest.change,
-      changeRate: latest.changeRate,
-      periodRate: Number(periodRate.toFixed(2)),
-      naverUrl: `${NAVER_PC_BASE_URL}/world/sise.naver?symbol=${encodeURIComponent(symbol)}`
+      latestPrice: Number(mergedLatest.close.toFixed(2)),
+      change: Number(mergedLatest.change.toFixed(2)),
+      changeRate: Number(mergedLatest.changeRate.toFixed(2)),
+      periodRate: Number(blendedPeriodRate.toFixed(2)),
+      naverUrl: `${NAVER_PC_BASE_URL}/world/sise.naver?symbol=${encodeURIComponent(symbol)}`,
+      yahooUrl: `https://finance.yahoo.com/quote/${encodeURIComponent(yahooSymbol)}`
     },
     recommendations: (sampleRecommendations[market]?.[period] || []).map((pick) => ({
       ...pick,
-      score: Number(clamp(pick.score + periodRate * 0.8, 55, 96).toFixed(1)),
-      rationale: `${pick.rationale} 네이버 금융 지수 기준 ${period === 'weekly' ? '주간' : '일일'} 변동률 ${periodRate.toFixed(2)}%를 함께 참고했습니다.`,
+      score: Number(clamp(pick.score + blendedPeriodRate * 0.8, 55, 96).toFixed(1)),
+      rationale: yahooHistory
+        ? `${pick.rationale} 네이버와 Yahoo Finance 지수 기준 ${period === 'weekly' ? '주간' : '일일'} 평균 변동률 ${blendedPeriodRate.toFixed(2)}%를 함께 참고했습니다.`
+        : `${pick.rationale} 네이버 금융 지수 기준 ${period === 'weekly' ? '주간' : '일일'} 변동률 ${periodRate.toFixed(2)}%를 함께 참고했습니다.`,
       naverUrl: `${NAVER_PC_BASE_URL}/world/sise.naver?symbol=${encodeURIComponent(symbol)}`,
-      dataSources: ['naver']
+      yahooUrl: `https://finance.yahoo.com/quote/${encodeURIComponent(yahooSymbol)}`,
+      dataSources
     }))
   };
 }

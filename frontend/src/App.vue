@@ -30,6 +30,10 @@ const sourceLabel = computed(() => {
     return 'Naver + Daum';
   }
 
+  if (source.value === 'naver-yahoo-finance') {
+    return 'Naver + Yahoo';
+  }
+
   if (source.value === 'naver-finance') {
     return 'Naver';
   }

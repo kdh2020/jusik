@@ -13,7 +13,9 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       data,
-      source: data.dataSources?.includes('daum') ? 'naver-daum-finance' : 'naver-finance'
+      source: data.dataSources?.includes('daum')
+        ? 'naver-daum-finance'
+        : (data.dataSources?.includes('yahoo') ? 'naver-yahoo-finance' : 'naver-finance')
     });
   } catch (error) {
     console.warn(`Falling back from Naver Finance data: ${error.message}`);
